@@ -1,42 +1,42 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-name: Dart
-
+name: Deploy App on AppCenter
 on:
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
-
+    branches:
+      - master
+      - 'releases/**'
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  setup-flutter:
+    name: Setup Flutter
+    runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v3
-
-      # Note: This workflow uses the latest stable version of the Dart SDK.
-      # You can specify other versions if desired, see documentation here:
-      # https://github.com/dart-lang/setup-dart/blob/main/README.md
-      # - uses: dart-lang/setup-dart@v1
-      - uses: dart-lang/setup-dart@9a04e6d73cca37bd455e0608d7e5092f881fd603
-
-      - name: Install dependencies
-        run: dart pub get
-
-      # Uncomment this step to verify the use of 'dart format' on each commit.
-      # - name: Verify formatting
-      #   run: dart format --output=none --set-exit-if-changed .
-
-      # Consider passing '--fatal-infos' for slightly stricter analysis.
-      - name: Analyze project source
-        run: dart analyze
-
-      # Your project will need to have tests in test/ and a dependency on
-      # package:test for this step to succeed. Note that Flutter projects will
-      # want to change this to 'flutter test'.
-      - name: Run tests
-        run: dart test
+      - run: echo "🎉 Triggered by a ${{ github.event_name }} on ${{ github.ref }}"
+      - name: Check out repository code
+        uses: actions/checkout@v3
+      - name: Install jq
+        uses: dcarbone/install-jq-action@v2.0.2
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: master
+          architecture: x64
+      - run: flutter pub get
+  setup-appcenter-cli: # must have node and npm installed!
+      name: Setup AppCenter CLI
+      runs-on: self-hosted
+      steps:
+      - name: Install appcenter-cli
+        uses: charliealbright/appcenter-cli-action@v1.0.1
+        with:
+          token: '${{secrets.APPCENTER_API_TOKEN}}'
+          command: 'appcenter help'
+  # deploy_iOS:
+  #   name: Deploy iOS
+  #   needs: [setup-flutter, setup-appcenter-cli]
+  #   uses: ./.github/workflows/deploy_ios.yml
+  deploy_android:
+    name: Deploy Android
+    needs: [setup-flutter, setup-appcenter-cli]
+    uses: ./.github/workflows/deploy_android.yml
+    secrets: inherit
+    with:
+      file: './build/app/outputs/apk/release/app-release.apk'
+      name: 'AlvaroBarrosC/GithubAction-Android'
